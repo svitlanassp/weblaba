@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+    <meta charset="UTF-8">
+    <title>TravelFlow | Auth & Planning</title>
+    <style>
+        :root { --primary: #007bff; --danger: #dc3545; --success: #28a745; --warning: #ffc107; }
+        body { font-family: 'Segoe UI', sans-serif; margin: 0; background: #f0f2f5; display: flex; flex-direction: column; align-items: center; }
+        .container { width: 95%; max-width: 1200px; margin-top: 20px; }
+        .card { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); margin-bottom: 20px; position: relative; }
+        .hidden { display: none; }
+        .flex-row { display: flex; gap: 20px; flex-wrap: wrap; }
+        .col-30 { flex: 3; min-width: 300px; }
+        .col-70 { flex: 7; min-width: 500px; }
+
+        .calendar-grid { display: flex; gap: 15px; overflow-x: auto; padding-bottom: 10px; }
+        .day-column { background: #e9ecef; min-width: 250px; border-radius: 8px; padding: 10px; min-height: 400px; border: 1px dashed #ccc; }
+        .day-header { font-weight: bold; text-align: center; margin-bottom: 10px; color: #495057; border-bottom: 2px solid #dee2e6; }
+
+        .item-card { background: white; padding: 10px; border-radius: 6px; margin-bottom: 10px; font-size: 14px; border-left: 4px solid var(--primary); position: relative; transition: 0.2s; }
+        .item-card:hover { transform: translateY(-2px); box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+        .expense-card { border-left-color: var(--success); }
+        .idea-card { border-left-color: var(--warning); }
+
+        .delete-btn { position: absolute; top: 5px; right: 5px; background: none; border: none; color: #ccc; cursor: pointer; font-size: 16px; width: 24px; height: 24px; padding: 0; line-height: 1; transition: 0.2s; }
+        .delete-btn:hover { color: var(--danger); }
+
+        input, select, button { padding: 10px; margin: 5px 0; border: 1px solid #ddd; border-radius: 6px; width: 100%; box-sizing: border-box; }
+        button { background: var(--primary); color: white; border: none; cursor: pointer; font-weight: bold; transition: 0.3s; }
+        button:hover { opacity: 0.9; }
+        .btn-outline { background: transparent; color: var(--primary); border: 1px solid var(--primary); margin-top: 10px; }
+        .btn-small { width: auto; padding: 4px 8px; font-size: 11px; margin: 2px; }
+        .btn-danger { background: var(--danger); }
+        .badge { background: #eee; padding: 2px 6px; border-radius: 4px; font-size: 11px; float: right; margin-right: 20px; }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h1>🌍 TravelFlow Dashboard</h1>
+
+        <div id="auth-section" class="card" style="max-width: 400px; margin: 0 auto;">
+            <div id="login-form">
+                <h3>🔑 Вхід</h3>
+                <input type="text" id="login-user" placeholder="Логін" value="admin">
+                <input type="password" id="login-pass" placeholder="Пароль" value="admin123">
+                <button onclick="login()">Увійти</button>
+                <button class="btn-outline" onclick="toggleAuth(true)">Немає акаунту? Реєстрація</button>
+            </div>
+            <div id="register-form" class="hidden">
+                <h3>📝 Реєстрація</h3>
+                <div id="reg-error" style="color:red; font-size:12px;"></div>
+                <input type="text" id="reg-user" placeholder="Логін">
+                <input type="email" id="reg-email" placeholder="Email">
+                <input type="password" id="reg-pass" placeholder="Пароль">
+                <input type="password" id="reg-pass-confirm" placeholder="Підтвердіть пароль">
+                <button onclick="register()" style="background: var(--success);">Створити акаунт</button>
+                <button class="btn-outline" onclick="toggleAuth(false)">Вже є акаунт? Увійти</button>
+            </div>
+        </div>
+
+        <div id="main-content" class="hidden">
+            <div class="card">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <h3>✈️ Мої подорожі</h3>
+                    <button onclick="logout()" class="btn-small btn-danger">Вийти</button>
+                </div>
+                <div id="trip-list" class="flex-row"></div>
+                <hr>
+                <h4>Створити нову подорож</h4>
+                <div style="display: grid; grid-template-columns: 2fr 1fr 1fr 1fr 1fr; gap: 10px;">
+                    <input type="text" id="t-title" placeholder="Куди їдемо?">
+                    <input type="text" id="t-country" placeholder="Країна">
+                    <input type="date" id="t-start">
+                    <input type="date" id="t-end">
+                    <input type="number" id="t-budget" placeholder="Бюджет $">
+                </div>
+                <button onclick="createTrip()" style="background: var(--success);">Створити подорож</button>
+            </div>
+
+            <div id="trip-details" class="hidden">
+                <div class="card" style="background: var(--primary); color: white;">
+                    <button class="delete-btn" style="color: white; font-size: 20px;" onclick="deleteTrip(currentTrip.id)">🗑️</button>
+                    <h2 id="view-trip-title" style="margin-top: 0;">...</h2>
+                    <p id="view-trip-info">...</p>
+                    <h3 id="view-trip-budget">...</h3>
+                </div>
+
+                <div class="flex-row">
+                    <div class="col-30">
+                        <div class="card">
+                            <h3>💡 Банк ідей</h3>
+                            <div id="ideas-bank"></div>
+                            <hr>
+                            <input type="text" id="place-name" placeholder="Назва локації">
+                            <input type="number" id="place-cost" placeholder="Вартість $">
+                            <button onclick="addPlace()">Додати в банк</button>
+                        </div>
+
+                        <div class="card">
+                            <h3>💰 Витрати</h3>
+                            <div id="expenses-list"></div>
+                            <hr>
+                            <input type="text" id="exp-name" placeholder="Опис">
+                            <input type="number" id="exp-amount" placeholder="Сума $">
+                            <button onclick="addExpense()" style="background: var(--success);">Додати витрату</button>
+                        </div>
+
+                        <div class="card">
+                            <h3>✅ Чек-лісти</h3>
+                            <div id="checklists-container"></div>
+                            <hr>
+                            <input type="text" id="group-name" placeholder="Назва списку">
+                            <button onclick="addChecklistGroup()">+ Новий список</button>
+                        </div>
+                    </div>
+
+                    <div class="col-70">
+                        <div class="card">
+                            <h3>📅 План (Календар)</h3>
+                            <div id="calendar-grid" class="calendar-grid"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let token = localStorage.getItem('travel_token') || '';
+        let currentTrip = null;
+        const API_BASE = 'http://127.0.0.1:8000/api';
+
+        window.onload = () => { if (token) { showDashboard(); loadTrips(); } };
+
+        function showDashboard() {
+            document.getElementById('auth-section').classList.add('hidden');
+            document.getElementById('main-content').classList.remove('hidden');
+        }
+
+        async function api(path, method = 'GET', body = null) {
+            const options = {
+                method,
+                headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }
+            };
+            if (body) options.body = JSON.stringify(body);
+            const res = await fetch(`${API_BASE}/${path}`, options);
+            if (res.status === 401) logout();
+            if (res.status === 204) return true;
+            return res.json();
+        }
+
+        /* --- AUTH --- */
+        async function login() {
+            const username = document.getElementById('login-user').value;
+            const password = document.getElementById('login-pass').value;
+            const res = await api('login/', 'POST', { username, password });
+            if (res && res.access) {
+                token = res.access;
+                localStorage.setItem('travel_token', token);
+                showDashboard();
+                loadTrips();
+            } else alert("Помилка входу");
+        }
+
+        function logout() { localStorage.removeItem('travel_token'); location.reload(); }
+        function toggleAuth(reg) {
+            document.getElementById('login-form').classList.toggle('hidden', reg);
+            document.getElementById('register-form').classList.toggle('hidden', !reg);
+        }
+
+        /* --- TRIPS --- */
+        async function loadTrips() {
+            const trips = await api('trips/');
+            document.getElementById('trip-list').innerHTML = trips.map(t => `
+                <div class="card" style="flex:1; min-width:200px; cursor:pointer;" onclick="loadTripDetail(${t.id})">
+                    <strong>${t.title}</strong><br><small>${t.start_date}</small>
+                </div>
+            `).join('');
+        }
+
+        async function createTrip() {
+            const data = {
+                title: document.getElementById('t-title').value,
+                country: document.getElementById('t-country').value,
+                start_date: document.getElementById('t-start').value,
+                end_date: document.getElementById('t-end').value,
+                total_budget: document.getElementById('t-budget').value || 0,
+                city: "Travel"
+            };
+            await api('trips/', 'POST', data);
+            loadTrips();
+        }
+
+        async function deleteTrip(id) {
+            if (confirm("Видалити всю подорож?")) {
+                await api(`trips/${id}/`, 'DELETE');
+                location.reload();
+            }
+        }
+
+        async function loadTripDetail(id) {
+            const trip = await api(`trips/${id}/`);
+            currentTrip = trip;
+            document.getElementById('trip-details').classList.remove('hidden');
+            document.getElementById('view-trip-title').innerText = trip.title;
+            document.getElementById('view-trip-info').innerText = `${trip.country} | ${trip.start_date} — ${trip.end_date}`;
+            document.getElementById('view-trip-budget').innerText = `Витрачено: $${trip.total_spent} / Бюджет: $${trip.total_budget}`;
+            renderCalendar(trip);
+            renderIdeas(trip.places);
+            renderExpenses(trip.expenses);
+            renderChecklists(trip.checklists);
+        }
+
+        /* --- PLACES --- */
+        function renderCalendar(trip) {
+            const grid = document.getElementById('calendar-grid');
+            grid.innerHTML = '';
+            let d = new Date(trip.start_date);
+            let end = new Date(trip.end_date);
+            while(d <= end) {
+                const ds = d.toISOString().split('T')[0];
+                const dayPlaces = trip.places.filter(p => p.visit_date === ds);
+                const col = document.createElement('div');
+                col.className = 'day-column';
+                col.innerHTML = `<div class="day-header">${ds}</div>` +
+                    dayPlaces.map(p => `
+                        <div class="item-card">
+                            <button class="delete-btn" onclick="deletePlace(${p.id})">×</button>
+                            <b>${p.title}</b> <span class="badge">$${p.cost}</span><br>
+                            <button class="btn-small" style="background:#6c757d" onclick="updatePlaceDate(${p.id}, null)">🔙 Idea</button>
+                        </div>
+                    `).join('');
+                grid.appendChild(col);
+                d.setDate(d.getDate() + 1);
+            }
+        }
+
+        function renderIdeas(places) {
+            document.getElementById('ideas-bank').innerHTML = places.filter(p => !p.visit_date).map(p => `
+                <div class="item-card idea-card">
+                    <button class="delete-btn" onclick="deletePlace(${p.id})">×</button>
+                    <b>${p.title}</b> <span class="badge">$${p.cost}</span><br>
+                    <input type="date" id="date-${p.id}" class="btn-small">
+                    <button class="btn-small" onclick="movePlace(${p.id})">📍 План</button>
+                </div>
+            `).join('');
+        }
+
+        async function addPlace() {
+            const title = document.getElementById('place-name').value;
+            const cost = document.getElementById('place-cost').value || 0;
+            await api('places/', 'POST', { trip: currentTrip.id, title, cost });
+            loadTripDetail(currentTrip.id);
+        }
+
+        async function movePlace(id) {
+            const date = document.getElementById(`date-${id}`).value;
+            if (date) { await api(`places/${id}/`, 'PATCH', { visit_date: date }); loadTripDetail(currentTrip.id); }
+        }
+
+        async function updatePlaceDate(id, date) {
+            await api(`places/${id}/`, 'PATCH', { visit_date: date });
+            loadTripDetail(currentTrip.id);
+        }
+
+        async function deletePlace(id) {
+            if (confirm("Видалити це місце?")) {
+                await api(`places/${id}/`, 'DELETE');
+                loadTripDetail(currentTrip.id);
+            }
+        }
+
+        /* --- EXPENSES --- */
+        function renderExpenses(expenses) {
+            document.getElementById('expenses-list').innerHTML = expenses.map(e => `
+                <div class="item-card expense-card">
+                    <button class="delete-btn" onclick="deleteExpense(${e.id})">×</button>
+                    <b>${e.title}</b>: $${e.amount}
+                </div>
+            `).join('');
+        }
+
+        async function addExpense() {
+            const title = document.getElementById('exp-name').value;
+            const amount = document.getElementById('exp-amount').value;
+            await api('expenses/', 'POST', { trip: currentTrip.id, title, amount });
+            loadTripDetail(currentTrip.id);
+        }
+
+        async function deleteExpense(id) {
+            await api(`expenses/${id}/`, 'DELETE');
+            loadTripDetail(currentTrip.id);
+        }
+
+        /* --- CHECKLISTS --- */
+        function renderChecklists(lists) {
+            document.getElementById('checklists-container').innerHTML = lists.map(l => `
+                <div style="margin-top:10px; border-top:1px solid #eee; padding-top:5px; position:relative;">
+                    <button class="delete-btn" onclick="deleteChecklist(${l.id})">🗑️</button>
+                    <strong>${l.title}</strong>
+                    ${l.items.map(i => `
+                        <div style="font-size:13px; display:flex; align-items:center;">
+                            <input type="checkbox" style="width:auto; margin-right:5px;" ${i.is_done?'checked':''} onclick="toggleItem(${i.id})">
+                            <span style="flex-grow:1">${i.text}</span>
+                            <button onclick="deleteItem(${i.id})" style="background:none; border:none; color:#ccc; cursor:pointer;">×</button>
+                        </div>
+                    `).join('')}
+                    <div style="display:flex;"><input id="ni-${l.id}" placeholder="+" style="padding:2px;"><button onclick="addItem(${l.id})" class="btn-small">+</button></div>
+                </div>
+            `).join('');
+        }
+
+        async function addChecklistGroup() {
+            const title = document.getElementById('group-name').value;
+            await api('checklists/groups/', 'POST', { trip: currentTrip.id, title });
+            loadTripDetail(currentTrip.id);
+        }
+
+        async function deleteChecklist(id) {
+            if (confirm("Видалити список?")) { await api(`checklists/groups/${id}/`, 'DELETE'); loadTripDetail(currentTrip.id); }
+        }
+
+        async function addItem(lid) {
+            const text = document.getElementById(`ni-${lid}`).value;
+            await api('checklists/items/', 'POST', { checklist: lid, text });
+            loadTripDetail(currentTrip.id);
+        }
+
+        async function deleteItem(id) {
+            await api(`checklists/items/${id}/`, 'DELETE');
+            loadTripDetail(currentTrip.id);
+        }
+
+        async function toggleItem(id) {
+            await api(`checklists/items/${id}/toggle/`, 'POST');
+            loadTripDetail(currentTrip.id);
+        }
+    </script>
+</body>
+</html>
