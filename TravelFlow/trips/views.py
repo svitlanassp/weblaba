@@ -111,19 +111,6 @@ class PlaceDetailView(APIView):
         repo_manager.places.delete(pk)
         return Response(status=status.HTTP_204_NO_CONTENT)
 
-    def patch(self, request, pk):
-        new_order = request.data.get('order')
-
-        if 'visit_date' in request.data:
-            new_date = request.data.get('visit_date')
-        else:
-            new_date = None
-
-        success = repo_manager.places.update_dnd_status(pk, new_order, new_date)
-        if success:
-            return Response({"status": "updated"})
-        return Response({"error": "failed"}, status=400)
-
 class PlaceListCreateView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 

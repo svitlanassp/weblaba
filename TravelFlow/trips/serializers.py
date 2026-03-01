@@ -13,13 +13,14 @@ class CategorySerializer(serializers.ModelSerializer):
 
 class PlaceSerializer(serializers.ModelSerializer):
     category_name = serializers.ReadOnlyField(source='category.name')
+    category_color = serializers.ReadOnlyField(source='category.color')
 
     class Meta:
         model = Place
         fields = [
-            'id', 'trip', 'category', 'category_name', 'title',
+            'id', 'trip', 'category', 'category_name','category_color', 'title',
             'description', 'address', 'link', 'notes',
-            'visit_date', 'visit_time', 'cost', 'order'
+            'visit_date', 'visit_time', 'cost'
         ]
         read_only_fields = ['id']
 
@@ -54,15 +55,16 @@ class TripListSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Trip
-        fields = ['id', 'user', 'title', 'country', 'city', 'start_date', 'end_date']
+        fields = ['id', 'user', 'title', 'country', 'city', 'start_date', 'end_date', 'cover_image']
 
 class ExpenseSerializer(serializers.ModelSerializer):
     category_name = serializers.ReadOnlyField(source='category.name')
     date = serializers.SerializerMethodField()
+    category_color = serializers.ReadOnlyField(source='category.color')
 
     class Meta:
         model = Expense
-        fields = ['id', 'trip', 'category', 'category_name', 'title', 'amount', 'date']
+        fields = ['id', 'trip', 'category', 'category_name','category_color', 'title', 'amount', 'date']
         read_only_fields = ['id']
 
     def get_date(self, obj):

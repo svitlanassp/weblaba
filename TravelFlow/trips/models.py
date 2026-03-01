@@ -10,6 +10,7 @@ class Trip(models.Model):
     country = models.CharField(max_length=100, blank=True, null=True)
     city = models.CharField(max_length=100, blank=True, null=True)
 
+    cover_image = models.ImageField(upload_to='trip_covers/', blank=True, null=True, verbose_name="Обкладинка")
     description = models.TextField(blank=True, null=True)
     start_date = models.DateField()
     end_date = models.DateField()
@@ -22,6 +23,7 @@ class Trip(models.Model):
 
 class Category(models.Model):
     name = models.CharField(max_length=100)
+    color = models.CharField(max_length=7, default="#CCCCCC", verbose_name="Колір (HEX)")
 
     class Meta:
         verbose_name_plural = "Categories"
@@ -46,10 +48,9 @@ class Place(models.Model):
     visit_time = models.TimeField(null=True, blank=True, verbose_name="Час візиту")
 
     cost = models.DecimalField(max_digits=10, decimal_places=2, default=0, verbose_name="Вартість")
-    order = models.PositiveIntegerField(default=0, null=True, verbose_name="Порядок")
 
     class Meta:
-        ordering = ['order']
+        ordering = ['visit_date', 'visit_time']
 
     def __str__(self):
         return self.title
