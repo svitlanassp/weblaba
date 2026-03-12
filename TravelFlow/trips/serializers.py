@@ -52,10 +52,16 @@ class ChecklistSerializer(serializers.ModelSerializer):
 
 class TripListSerializer(serializers.ModelSerializer):
     user = serializers.HiddenField(default=serializers.CurrentUserDefault())
+    total_spent = serializers.SerializerMethodField()
 
     class Meta:
         model = Trip
-        fields = ['id', 'user', 'title', 'country', 'city', 'start_date', 'end_date', 'cover_image']
+        fields = ['id', 'user', 'title', 'country', 'city', 'start_date', 'end_date', 'cover_image', 'total_budget', 'total_spent']
+
+    def get_total_spent(self, obj):
+        places_cost = sum(place.cost for place in obj.places.all())
+        additional_expenses = sum(exp.amount for exp in obj.expenses.all())
+        return places_cost + additional_expenses
 
 class ExpenseSerializer(serializers.ModelSerializer):
     category_name = serializers.ReadOnlyField(source='category.name')

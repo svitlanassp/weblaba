@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TravelFlow API Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; background: #f4f7f6; }
+        .container { max-width: 900px; margin: 0 auto; }
+        .section { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); margin-bottom: 20px; }
+        .hidden { display: none; }
+        input, select, button { padding: 8px; margin: 5px 0; width: 100%; box-sizing: border-box; }
+        button { background: #007bff; color: white; border: none; cursor: pointer; border-radius: 4px; }
+        button:hover { background: #0056b3; }
+        .card { border: 1px solid #ddd; padding: 10px; margin: 10px 0; border-radius: 4px; cursor: pointer; transition: 0.2s; }
+        .card:hover { background: #f1f1f1; border-color: #007bff; }
+        .flex-row { display: flex; gap: 20px; }
+        .flex-col { flex: 1; }
+        .badge { display: inline-block; padding: 3px 8px; border-radius: 12px; font-size: 12px; color: white;}
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h2>TravelFlow API - Тестовий стенд</h2>
+
+    <div class="section" id="auth-section">
+        <h3>1. Авторизація</h3>
+        <p><small>Введи логін та пароль свого існуючого користувача з Django</small></p>
+        <input type="text" id="username" placeholder="Логін">
+        <input type="password" id="password" placeholder="Пароль">
+        <input type="text" id="api-url" value="http://127.0.0.1:8000/api" placeholder="Базовий URL API">
+        <button onclick="login()">Увійти та завантажити дані</button>
+    </div>
+
+    <div class="section hidden" id="trips-section">
+        <h3>2. Мої Подорожі</h3>
+        <div id="trips-list"></div>
+        <hr>
+        <h4>➕ Додати нову подорож</h4>
+        <form id="add-trip-form">
+            <input type="text" id="trip-title" placeholder="Назва (напр. Вихідні в Карпатах)" required>
+            <input type="date" id="trip-start" required>
+            <input type="date" id="trip-end" required>
+            <label><small>Обкладинка (необов'язково):</small></label>
+            <input type="file" id="trip-cover" accept="image/*">
+            <button type="submit">Створити подорож</button>
+        </form>
+    </div>
+
+    <div class="section hidden" id="trip-details-section">
+        <h3 id="current-trip-title">Вибрана подорож</h3>
+        <input type="hidden" id="current-trip-id">
+
+        <div class="flex-row">
+            <div class="flex-col">
+                <h4>📍 Місця (Places)</h4>
+                <div id="places-list"></div>
+                <form id="add-place-form" style="margin-top:15px; border-top: 1px solid #ccc; padding-top: 10px;">
+                    <input type="text" id="place-title" placeholder="Назва місця" required>
+                    <select id="place-category" required></select>
+                    <input type="date" id="place-date" required>
+                    <button type="submit">Додати місце</button>
+                </form>
+            </div>
+
+            <div class="flex-col">
+                <h4>💸 Витрати (Expenses)</h4>
+                <div id="expenses-list"></div>
+                <form id="add-expense-form" style="margin-top:15px; border-top: 1px solid #ccc; padding-top: 10px;">
+                    <input type="text" id="expense-title" placeholder="На що витратили?" required>
+                    <select id="expense-category" required></select>
+                    <input type="number" id="expense-amount" placeholder="Сума" step="0.01" required>
+                    <button type="submit">Додати витрату</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    let API_BASE = '';
+    let authHeaders = {};
+
+    // 1. АВТОРИЗАЦІЯ ТА ОТРИМАННЯ КАТЕГОРІЙ
+    async function login() {
+        API_BASE = document.getElementById('api-url').value;
+        const user = document.getElementById('username').value;
+        const pass = document.getElementById('password').value;
+
+        // Використовуємо Basic Auth для швидкого тестування без токенів
+        const credentials = btoa(user + ':' + pass);
+        authHeaders = { 'Authorization': 'Basic ' + credentials };
+
+        try {
+            // Перевіряємо авторизацію, завантажуючи категорії
+            const res = await fetch(`${API_BASE}/categories/`, { headers: authHeaders });
+            if (res.ok) {
+                const categories = await res.json();
+                populateCategories('place-category', categories);
+                populateCategories('expense-category', categories);
+
+                document.getElementById('auth-section').style.display = 'none';
+                document.getElementById('trips-section').classList.remove('hidden');
+                loadTrips();
+            } else {
+                alert('Помилка входу! Перевір логін, пароль або налаштування CORS.');
+            }
+        } catch (e) {
+            alert('Помилка з\'єднання із сервером: ' + e.message);
+        }
+    }
+
+    function populateCategories(selectId, categories) {
+        const select = document.getElementById(selectId);
+        select.innerHTML = '';
+        categories.forEach(c => {
+            select.innerHTML += `<option value="${c.id}">${c.name}</option>`;
+        });
+    }
+
+    // 2. ЗАВАНТАЖЕННЯ ВСІХ ПОДОРОЖЕЙ
+    async function loadTrips() {
+        const res = await fetch(`${API_BASE}/trips/`, { headers: authHeaders });
+        const trips = await res.json();
+        const list = document.getElementById('trips-list');
+        list.innerHTML = '';
+
+        // Адреса твого сервера
+        const SERVER_URL = "http://127.0.0.1:8000";
+
+        trips.forEach(trip => {
+            // Додаємо адресу сервера до шляху картинки
+            const imageUrl = trip.cover_image
+                ? (trip.cover_image.startsWith('http') ? trip.cover_image : SERVER_URL + trip.cover_image)
+                : 'https://via.placeholder.com/150';
+
+            list.innerHTML += `
+                <div class="card" onclick="loadTripDetails(${trip.id}, '${trip.title}')">
+                    <img src="${imageUrl}" style="width: 80px; height: 50px; object-fit: cover; border-radius: 4px; margin-right: 10px; vertical-align: middle;">
+                    <strong>${trip.title}</strong><br>
+                    <small>${trip.start_date} — ${trip.end_date}</small>
+                </div>
+            `;
+        });
+    }
+
+    // 3. СТВОРЕННЯ ПОДОРОЖІ (POST з файлом)
+    document.getElementById('add-trip-form').addEventListener('submit', async (e) => {
+        e.preventDefault();
+
+        const formData = new FormData();
+        formData.append('title', document.getElementById('trip-title').value);
+        formData.append('start_date', document.getElementById('trip-start').value);
+        formData.append('end_date', document.getElementById('trip-end').value);
+
+        const fileInput = document.getElementById('trip-cover');
+        if (fileInput.files.length > 0) {
+            formData.append('cover_image', fileInput.files[0]);
+        }
+
+        const res = await fetch(`${API_BASE}/trips/`, {
+            method: 'POST',
+            headers: authHeaders, // Content-Type не вказуємо, бо браузер сам ставить multipart/form-data
+            body: formData
+        });
+
+        if (res.ok) {
+            document.getElementById('add-trip-form').reset();
+            loadTrips();
+        } else {
+            console.error(await res.json());
+            alert("Помилка створення подорожі");
+        }
+    });
+
+    // 4. ЗАВАНТАЖЕННЯ ДЕТАЛЕЙ ПОДОРОЖІ
+    async function loadTripDetails(id, title) {
+        document.getElementById('current-trip-id').value = id;
+        document.getElementById('current-trip-title').innerText = title;
+        document.getElementById('trip-details-section').classList.remove('hidden');
+
+        const res = await fetch(`${API_BASE}/trips/${id}/`, { headers: authHeaders });
+        const tripData = await res.json();
+
+        // Рендер Місць
+        const placesList = document.getElementById('places-list');
+        placesList.innerHTML = '';
+        tripData.places.forEach(p => {
+            placesList.innerHTML += `
+                <div class="card">
+                    <span class="badge" style="background-color: ${p.category_color}">${p.category_name}</span>
+                    <strong>${p.title}</strong> (${p.visit_date})
+                </div>`;
+        });
+
+        // Рендер Витрат
+        const expensesList = document.getElementById('expenses-list');
+        expensesList.innerHTML = '';
+        tripData.expenses.forEach(e => {
+            expensesList.innerHTML += `
+                <div class="card">
+                    <span class="badge" style="background-color: ${e.category_color}">${e.category_name}</span>
+                    <strong>${e.title}</strong> - ${e.amount} грн
+                </div>`;
+        });
+    }
+
+    // 5. ДОДАВАННЯ МІСЦЯ (POST JSON)
+    document.getElementById('add-place-form').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const tripId = document.getElementById('current-trip-id').value;
+        const data = {
+            trip: tripId,
+            title: document.getElementById('place-title').value,
+            category: document.getElementById('place-category').value,
+            visit_date: document.getElementById('place-date').value
+        };
+
+        const res = await fetch(`${API_BASE}/places/`, {
+            method: 'POST',
+            headers: { ...authHeaders, 'Content-Type': 'application/json' },
+            body: JSON.stringify(data)
+        });
+
+        if (res.ok) loadTripDetails(tripId, document.getElementById('current-trip-title').innerText);
+        else alert("Помилка! Дата візиту не в межах подорожі?");
+    });
+
+    // 6. ДОДАВАННЯ ВИТРАТИ (POST JSON)
+    document.getElementById('add-expense-form').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const tripId = document.getElementById('current-trip-id').value;
+        const data = {
+            trip: tripId,
+            title: document.getElementById('expense-title').value,
+            category: document.getElementById('expense-category').value,
+            amount: document.getElementById('expense-amount').value
+        };
+
+        const res = await fetch(`${API_BASE}/expenses/`, {
+            method: 'POST',
+            headers: { ...authHeaders, 'Content-Type': 'application/json' },
+            body: JSON.stringify(data)
+        });
+
+        if (res.ok) loadTripDetails(tripId, document.getElementById('current-trip-title').innerText);
+        else alert("Помилка створення витрати");
+    });
+
+</script>
+</body>
+</html>
