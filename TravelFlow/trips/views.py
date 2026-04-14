@@ -1,11 +1,17 @@
 from rest_framework import generics, status
+from rest_framework_simplejwt.views import TokenObtainPairView
 from rest_framework.permissions import AllowAny
+from .serializers import CustomTokenObtainPairSerializer
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status, permissions
 from .serializers import *
 from .repositories.manager import repo_manager
+from rest_framework.permissions import AllowAny, IsAuthenticated, IsAdminUser
 
+class CustomTokenObtainPairView(TokenObtainPairView):
+    permission_classes = (AllowAny,)
+    serializer_class = CustomTokenObtainPairSerializer
 
 class RegisterView(generics.CreateAPIView):
     queryset = User.objects.all()
@@ -59,15 +65,6 @@ class TripDetailView(APIView):
 
         repo_manager.trips.delete(pk)
         return Response(status=status.HTTP_204_NO_CONTENT)
-
-
-class CategoryListView(APIView):
-    permission_classes = [permissions.IsAuthenticated]
-
-    def get(self, request):
-        categories = repo_manager.categories.get_all()
-        serializer = CategorySerializer(categories, many=True)
-        return Response(serializer.data)
 
 
 class ChecklistToggleView(APIView):
@@ -204,4 +201,69 @@ class ChecklistItemDetailView(APIView):
             return Response({"error": "Пункт не знайдено"}, status=status.HTTP_404_NOT_FOUND)
 
         repo_manager.checklist_items.delete(pk)
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+class UserListView(APIView):
+    permission_classes = [IsAuthenticated, IsAdminUser]
+
+    def get(self, request):
+        users = User.objects.all()
+        serializer = UserSerializer(users, many=True)
+        return Response(serializer.data)
+
+    def post(self, request):
+        data = request.data
+        username = data.get('username')
+        password = data.get('password')
+        is_staff = data.get('is_staff', False)
+
+        if not username or not password:
+            return Response({"error": "Username та password обов'язкові."}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            user = User.objects.create_user(
+                username=username,
+                password=password,
+                is_staff=is_staff
+            )
+            serializer = UserSerializer(user)
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        except Exception as e:
+            return Response({"error": "Користувач з таким ім'ям вже існує."}, status=status.HTTP_400_BAD_REQUEST)
+
+
+class UserDetailView(APIView):
+    permission_classes = [IsAuthenticated, IsAdminUser]
+
+    def get(self, request, pk):
+        try:
+            user = User.objects.get(pk=pk)
+        except User.DoesNotExist:
+            return Response({"error": "Користувача не знайдено"}, status=status.HTTP_404_NOT_FOUND)
+
+        serializer = UserSerializer(user)
+        return Response(serializer.data)
+
+    def put(self, request, pk):
+        try:
+            user = User.objects.get(pk=pk)
+        except User.DoesNotExist:
+            return Response({"error": "Користувача не знайдено"}, status=status.HTTP_404_NOT_FOUND)
+
+        serializer = UserSerializer(user, data=request.data, partial=True)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    def delete(self, request, pk):
+        try:
+            user = User.objects.get(pk=pk)
+        except User.DoesNotExist:
+            return Response({"error": "Користувача не знайдено"}, status=status.HTTP_404_NOT_FOUND)
+
+        if user == request.user:
+            return Response({"error": "Ви не можете видалити самі себе"}, status=status.HTTP_400_BAD_REQUEST)
+
+        user.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)

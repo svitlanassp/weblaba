@@ -1,24 +1,23 @@
 from rest_framework import serializers
-from .models import Trip, Category, Place, ChecklistItem, Expense, Checklist
+from .models import Trip, Place, ChecklistItem, Expense, Checklist
 
 from django.contrib.auth.models import User
 from django.contrib.auth.password_validation import validate_password
+from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 
-
-class CategorySerializer(serializers.ModelSerializer):
-    class Meta:
-        model = Category
-        fields = ['id', 'name']
-
+class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
+    def validate(self, attrs):
+        data = super().validate(attrs)
+        data['role'] = 'admin' if self.user.is_staff else 'user'
+        data['username'] = self.user.username
+        return data
 
 class PlaceSerializer(serializers.ModelSerializer):
-    category_name = serializers.ReadOnlyField(source='category.name')
-    category_color = serializers.ReadOnlyField(source='category.color')
 
     class Meta:
         model = Place
         fields = [
-            'id', 'trip', 'category', 'category_name','category_color', 'title',
+            'id', 'trip', 'category', 'title',
             'description', 'address', 'link', 'notes',
             'visit_date', 'visit_time', 'cost'
         ]
@@ -64,13 +63,11 @@ class TripListSerializer(serializers.ModelSerializer):
         return places_cost + additional_expenses
 
 class ExpenseSerializer(serializers.ModelSerializer):
-    category_name = serializers.ReadOnlyField(source='category.name')
     date = serializers.SerializerMethodField()
-    category_color = serializers.ReadOnlyField(source='category.color')
 
     class Meta:
         model = Expense
-        fields = ['id', 'trip', 'category', 'category_name','category_color', 'title', 'amount', 'date']
+        fields = ['id', 'trip', 'category', 'title', 'amount', 'date']
         read_only_fields = ['id']
 
     def get_date(self, obj):
@@ -121,4 +118,10 @@ class RegisterSerializer(serializers.ModelSerializer):
         validated_data.pop('password_confirm')
         user = User.objects.create_user(**validated_data)
         return user
+
+class UserSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = User
+        fields = ['id', 'username', 'email', 'first_name', 'last_name', 'is_staff', 'is_active']
+        read_only_fields = ['id']
 

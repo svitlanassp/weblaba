@@ -2,6 +2,13 @@ from django.db import models
 from django.contrib.auth.models import User
 from django.utils.timezone import now
 
+class TripCategory(models.TextChoices):
+    TRANSPORT = 'transport', 'Transport'
+    FOOD_DRINKS = 'food', 'Food & Drinks'
+    SIGHTSEEING = 'sightseeing', 'Sightseeing'
+    ENTERTAINMENT = 'entertainment', 'Entertainment'
+    SHOPPING = 'shopping', 'Shopping'
+    OTHERS = 'others', 'Others'
 
 class Trip(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='trips')
@@ -21,20 +28,14 @@ class Trip(models.Model):
     def __str__(self):
         return f"{self.title} ({self.city}, {self.country})"
 
-class Category(models.Model):
-    name = models.CharField(max_length=100)
-    color = models.CharField(max_length=7, default="#CCCCCC", verbose_name="Колір (HEX)")
-
-    class Meta:
-        verbose_name_plural = "Categories"
-
-    def __str__(self):
-        return self.name
-
 
 class Place(models.Model):
     trip = models.ForeignKey(Trip, on_delete=models.CASCADE, related_name='places')
-    category = models.ForeignKey(Category, on_delete=models.SET_NULL, null=True, blank=True)
+    category = models.CharField(
+        max_length=20,
+        choices=TripCategory.choices,
+        default=TripCategory.OTHERS
+    )
 
     title = models.CharField(max_length=250, verbose_name="Назва місця")
     description = models.TextField(blank=True, null=True, verbose_name="Опис")
@@ -57,7 +58,11 @@ class Place(models.Model):
 
 class Expense(models.Model):
     trip = models.ForeignKey(Trip, on_delete=models.CASCADE, related_name='expenses')
-    category = models.ForeignKey(Category, on_delete=models.SET_NULL, null=True, blank=True)
+    category = models.CharField(
+        max_length=20,
+        choices=TripCategory.choices,
+        default=TripCategory.OTHERS
+    )
     title = models.CharField(max_length=255)
     amount = models.DecimalField(max_digits=10, decimal_places=2)
     date = models.DateField(default=now, verbose_name="Дата витрати")
